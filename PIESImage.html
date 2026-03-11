@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIESImages</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body { background-color: #DDDDDD; font-family: 'Geneva', Arial, sans-serif; font-size: 13px; }
+        .mac-panel { background-color: #FFFFFF; border: 1px solid #000; box-shadow: 2px 2px 0 0 #3a3a3a; }
+        .mac-title-bar { background-color: #D52B1E; border-bottom: 1px solid #000; color: #FFF; font-weight: bold; padding: 4px 6px; }
+        .mac-button { border: 1px solid #000; background-color: #CCC; font-weight: bold; padding: 4px 10px; border-top-color: #FFF; border-left-color: #FFF; cursor: pointer; }
+        .mac-button:active { border-top-color: #000; border-left-color: #000; background-color: #AAA; }
+        .mac-input { border: 1px solid #000; background-color: white; padding: 4px; font-family: monospace; box-shadow: 1px 1px 0 0 #888 inset; }
+    </style>
+</head>
+<body class="flex items-start justify-center min-h-screen p-8">
+
+    <div id="loading-screen" class="fixed inset-0 flex items-center justify-center bg-[#DDDDDD] z-[9999]">
+        <div class="mac-panel p-6 text-center" style="width: 280px;">
+            <p class="text-3xl font-bold tracking-tighter border-b-2 border-black pb-2">PIESImages</p>
+            <p class="text-xs mt-2">Initialising Image Vault...</p>
+            <div class="h-3 bg-[#CCC] border border-black mt-4 overflow-hidden">
+                <div id="loading-bar" class="h-full bg-[#0000CC] transition-all duration-700 ease-linear" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="w-full max-w-4xl mac-panel hidden">
+        <div class="mac-title-bar flex justify-between">
+            <span>PIESImages</span>
+            <button onclick="logout()" class="bg-white text-black text-[10px] px-1 border border-black">X</button>
+        </div>
+
+        <div class="p-6">
+            <div id="auth-view" class="max-w-md mx-auto">
+                <h2 class="font-bold border-b border-black mb-4">Client Authentication</h2>
+                <input type="text" id="acc-id" placeholder="Account ID" class="mac-input w-full mb-2">
+                <input type="password" id="passkey" placeholder="Passkey" class="mac-input w-full mb-4">
+                <div class="flex space-x-2">
+                    <button onclick="handleAuth('login')" class="mac-button flex-grow">ACCESS</button>
+                    <button onclick="handleAuth('reg')" class="mac-button bg-gray-100">REGISTER</button>
+                </div>
+                <p id="msg" class="text-red-600 mt-2 text-center font-bold"></p>
+            </div>
+
+            <div id="vault-view" class="hidden">
+                <div class="mb-4 p-2 bg-yellow-100 border border-black text-xs font-bold">
+                    USER: <span id="user-tag" class="text-blue-800"></span> | MODE: <span class="text-green-700">ENCRYPTED-DISK-STORE</span>
+                </div>
+                
+                <div class="flex space-x-4">
+                    <div class="w-1/3 flex flex-col space-y-2">
+                        <input type="file" id="img-upload" accept="image/*" class="hidden" onchange="encryptAndStore()">
+                        <button onclick="document.getElementById('img-upload').click()" class="mac-button">UPLOAD & ENCRYPT</button>
+                        <button onclick="logout()" class="mac-button bg-red-100">LOGOUT & PURGE</button>
+                    </div>
+                    <div id="gallery" class="flex-grow mac-panel p-2 min-h-[300px] grid grid-cols-2 gap-2 overflow-y-auto max-h-[500px]">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let vaultKey = null;
+        let db;
+
+        // DB Initialization
+        const request = indexedDB.open("VOSI_IMG_VAULT", 1);
+        request.onupgradeneeded = (e) => {
+            db = e.target.result;
+            db.createObjectStore("users", { keyPath: "id" });
+            db.createObjectStore("images", { keyPath: "id" });
+        };
+        request.onsuccess = (e) => { db = e.target.result; };
+
+        // Cryptography (VOSI Standards)
+        function deriveKey(pass, salt) {
+            return CryptoJS.PBKDF2(pass, salt, { keySize: 256/32, iterations: 100000 }).toString();
+        }
+
+        async function handleAuth(type) {
+            const id = document.getElementById('acc-id').value;
+            const pass = document.getElementById('passkey').value;
+            const idHash = CryptoJS.SHA256(id).toString();
+
+            if (type === 'reg') {
+                const salt = CryptoJS.lib.WordArray.random(128/8).toString();
+                const passHash = deriveKey(pass, salt);
+                const tx = db.transaction("users", "readwrite");
+                tx.objectStore("users").add({ id: idHash, passHash, salt });
+                alert("Account Created locally.");
+            } else {
+                const tx = db.transaction("users", "readonly");
+                const user = await new Promise(res => {
+                    const req = tx.objectStore("users").get(idHash);
+                    req.onsuccess = () => res(req.result);
+                });
+
+                if (user && user.passHash === deriveKey(pass, user.salt)) {
+                    currentUser = idHash;
+                    vaultKey = pass; // Volatile RAM key
+                    document.getElementById('auth-view').classList.add('hidden');
+                    document.getElementById('vault-view').classList.remove('hidden');
+                    document.getElementById('user-tag').textContent = id;
+                    loadGallery();
+                } else {
+                    document.getElementById('msg').textContent = "AUTH FAILURE";
+                }
+            }
+        }
+
+        function encryptAndStore() {
+            const file = document.getElementById('img-upload').files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const encrypted = CryptoJS.AES.encrypt(e.target.result, vaultKey).toString();
+                const tx = db.transaction("images", "readwrite");
+                tx.objectStore("images").add({ 
+                    id: Date.now(), 
+                    owner: currentUser, 
+                    data: encrypted 
+                });
+                loadGallery();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function loadGallery() {
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            const tx = db.transaction("images", "readonly");
+            const req = tx.objectStore("images").getAll();
+            req.onsuccess = () => {
+                req.result.filter(img => img.owner === currentUser).forEach(img => {
+                    try {
+                        const bytes = CryptoJS.AES.decrypt(img.data, vaultKey);
+                        const src = bytes.toString(CryptoJS.enc.Utf8);
+                        const el = document.createElement('img');
+                        el.src = src;
+                        el.className = "border border-black w-full h-32 object-cover";
+                        gallery.appendChild(el);
+                    } catch (e) { console.error("Decryption error"); }
+                });
+            };
+        }
+
+        function logout() {
+            // Volatile RAM Purge
+            vaultKey = null;
+            currentUser = null;
+            location.reload(); 
+        }
+
+        // 10-Second Initialization Protocol
+        window.onload = () => {
+            const bar = document.getElementById('loading-bar');
+            bar.style.width = '100%';
+            setTimeout(() => {
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+            }, 10000);
+        };
+    </script>
+</body>
+</html> 
