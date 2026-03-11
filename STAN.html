@@ -1,0 +1,434 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>STAN - STakes ANalyst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #4A4A4A; font-family: 'Geneva', sans-serif; font-size: 12px; color: #000; }
+        .mac-window { background: #DDDDDD; border: 1px solid #000; box-shadow: 4px 4px 0 rgba(0,0,0,0.5); width: 600px; }
+        .mac-title { background: #D52B1E; color: white; padding: 5px 10px; font-weight: bold; border-bottom: 1px solid #000; cursor: default; }
+        .panel-inset { background: #EEEEEE; border: 1px solid #888; box-shadow: 1px 1px 0 #FFF inset; padding: 10px; }
+        .mac-input { border: 1px solid #000; padding: 4px; width: 100%; box-shadow: 1px 1px 0 #888 inset; margin-bottom: 8px; font-family: monospace; }
+        .mac-btn { border: 1px solid #000; background: #CCC; padding: 6px 12px; font-weight: bold; border-top-color: #FFF; border-left-color: #FFF; cursor: pointer; }
+        .mac-btn:active { border-top-color: #000; border-left-color: #000; background: #BBB; }
+        .console { background: #000; color: #0F0; font-family: 'Monaco', monospace; height: 180px; overflow-y: auto; padding: 8px; border: 1px solid #555; font-size: 11px; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+<div class="mac-window">
+    <div class="mac-title flex justify-between">
+        <span>STAN - Stakes Analyst for Betting</span>
+    </div>
+    
+    <div class="p-4 grid grid-cols-12 gap-4">
+        <div class="col-span-5 space-y-4">
+            <div class="panel-inset">
+                <p class="font-bold border-b border-gray-400 mb-2">INPUT PARAMETERS</p>
+                <label class="block mb-1 font-bold">Target Game:</label>
+<select id="game" class="mac-input bg-white cursor-pointer" onchange="runSimulation()">
+    <option value="cf">Coinflip (50% Win | 2x Payout)</option>
+    <option value="slots">Slots (-0.05x Avg Gain)</option>
+    <option value="blackjack">Blackjack (~48% Win | 2x Payout)</option>
+</select>
+                <label class="block mb-1 font-bold">Betting Strategy:</label>
+<select id="strategy" class="mac-input bg-white cursor-pointer" onchange="calculate()">
+    <option value="martingale">Martingale (Classic Double)</option>
+    <option value="dalembert">D'Alembert (Linear +/-)</option>
+    <option value="oscars">Oscar's Grind (Cycle-Based)</option>
+    <option value="paroli">Paroli(Hot Streak)</option>
+    <option value="kelly">Kelly Criterion(Optimal)</option>
+</select>
+                <label>Wallet Balance:</label>
+                <input type="number" id="balance" class="mac-input" value="0" oninput="updateLiveBet()">
+                <label>Base Bet:</label>
+                <input type="number" id="baseBet" class="mac-input" value="0" oninput="updateLiveBet()">
+                <label>Bet Multiplier:</label>
+                <input type="number" id="multiplier" class="mac-input" value="2" step="0.1">
+                <div class="mb-4">
+    <label class="block mb-1">Take Profit (Target Cowoncy)</label>
+    <input type="number" id="target-profit" class="mac-input" placeholder="e.g. 5000000">
+    
+    <label class="block mb-1">Stop Loss (Max Loss Limit)</label>
+    <input type="number" id="stop-loss" class="mac-input" placeholder="e.g. 100000">
+</div>
+                <div class="mt-4 border-t border-gray-400 pt-2">
+                    <label class="block font-bold mb-1 text-[10px] uppercase">Live Loss Streak:</label>
+                    <input type="number" id="live-streak" class="mac-input" value="0" oninput="updateStreakAlert()">
+                    <div id="streak-alert-box" class="p-2 border border-black text-center hidden">
+                        <div id="streak-prob" class="font-bold text-xs">--</div>
+                    </div>
+                    <div id="advisor-panel" class="panel-inset mt-4 hidden">
+    <p id="advisor-title" class="font-bold border-b border-gray-400 mb-2 uppercase text-[10px]">Advisor</p>
+    
+    <div id="bj-inputs" class="hidden">
+        <div class="grid grid-cols-2 gap-2">
+            <div>
+                <label class="block text-[9px] font-bold">Your Total:</label>
+                <input type="number" id="player-hand" class="mac-input" placeholder="e.g. 14" oninput="getAdvice()">
+            </div>
+            <div>
+                <label class="block text-[9px] font-bold">Dealer Upcard:</label>
+                <input type="number" id="dealer-card" class="mac-input" placeholder="2-11" oninput="getAdvice()">
+            </div>
+        </div>
+    </div>
+
+    <div id="cf-inputs" class="hidden text-center py-2">
+        <span class="text-[10px] text-gray-600 uppercase">Pattern Logic (H-H | T-T)</span>
+    </div>
+
+    <div id="advice-box" class="p-2 border border-black text-center bg-white font-bold text-blue-800 mt-2">
+        ADVICE: --
+    </div>
+</div>
+            </div>
+            
+            <button onclick="runSimulation()" class="mac-btn w-full bg-blue-100">RUN ANALYSIS</button>
+            <button onclick="exportToDiscord()" class="mac-btn w-full bg-green-200 mt-2">EXPORT TO DISCORD</button>
+        </div>
+
+ <p class="font-bold border-b border-gray-400 mb-3 text-center">LIVE PROJECTIONS</p>
+<div class="flex flex-col gap-4 text-[11px]">
+    <div class="grid grid-cols-2 gap-4 border-b border-gray-300 pb-2">
+        <div class="text-right text-gray-600">Max Safety Streak:</div>
+        <div id="m-streak" class="font-bold text-left">--</div>
+        
+        <div class="text-right text-gray-600">Risk of Ruin:</div>
+        <div id="m-ruin" class="font-bold text-left text-red-600">--</div>
+    </div>
+
+ <div class="panel-inset flex flex-col items-center justify-center bg-[#E8E8E8]">
+        <span class="text-[9px] uppercase font-bold text-gray-600 mb-1">Recommended Bet</span>
+        <span id="m-rec" class="text-2xl text-blue-800 font-mono font-bold tracking-tighter">--</span>
+    </div>
+
+ <div class="flex flex-col items-center pt-1">
+        <span class="text-gray-600 uppercase text-[9px] font-bold">Est. Profit / Hour</span>
+        <span id="m-profit" class="text-green-700 font-mono font-bold text-[13px] break-all text-center">--</span>
+    </div>
+</div>
+                <div id="console" class="console mt-4">
+                    >> System Ready...<br>
+                    >> Awaiting Input Parameters...
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="px-4 pb-4">
+        
+</div>
+
+<script>
+    function log(msg) {
+        const con = document.getElementById('console');
+        con.innerHTML += `<br>>> ${msg}`;
+        con.scrollTop = con.scrollHeight;
+    }
+    
+        function updateLiveBet() {
+        const balance = parseFloat(document.getElementById('balance').value) || 0;
+        const mult = parseFloat(document.getElementById('multiplier').value) || 2;
+        const safetyBuffer = 12; 
+        
+        let bestBet = Math.floor(balance * (mult - 1) / (Math.pow(mult, safetyBuffer) - 1));
+        document.getElementById('m-rec').innerText = bestBet > 0 ? bestBet.toLocaleString() : "1";
+    }
+
+    window.onload = updateLiveBet;
+    
+        function updateStreakAlert() {
+        const streak = parseInt(document.getElementById('live-streak').value) || 0;
+        const game = document.getElementById('game').value;
+        let winProb = 0.5;
+        if (game === 'slots') winProb = 0.475;
+        if (game === 'blackjack') winProb = 0.485;
+
+        const alertBox = document.getElementById('streak-alert-box');
+        const probDisplay = document.getElementById('streak-prob');
+
+        if (streak <= 0) {
+            alertBox.classList.add('hidden');
+            return;
+        }
+
+        alertBox.classList.remove('hidden');
+        const streakRarity = Math.pow((1 - winProb), streak) * 100;
+        probDisplay.innerHTML = `Streak Rarity: ${streakRarity.toFixed(4)}%`;
+        alertBox.style.backgroundColor = streak >= 7 ? "#fee2e2" : "#dcfce7";
+    }
+
+ function runSimulation() {
+    const game = document.getElementById('game').value;
+    const balance = parseFloat(document.getElementById('balance').value);
+    const baseBet = parseFloat(document.getElementById('baseBet').value);
+    const mult = parseFloat(document.getElementById('multiplier').value);
+    const strategy = document.getElementById('strategy').value; // Get the chosen system
+    
+    document.getElementById('console').innerHTML = ">> BOOTING ENGINE...";
+    
+    let currentBet = baseBet;
+    let totalCost = 0;
+    let losses = 0;
+    let winProb = 0.5; // Default (Coinflip)
+    let payout = 2.0;
+
+    if (game === 'slots') {
+        // Slots has a negative expectation of -0.05x
+        winProb = 0.475; // Adjusted to reflect the house edge
+        payout = 2.0;    // Simplified for streak analysis
+    } else if (game === 'blackjack') {
+        // Blackjack win rate is slightly lower than 50% due to dealer advantage
+        winProb = 0.485; 
+        payout = 2.0;
+    }
+    
+    if (mult <= 1 && strategy === 'martingale') {
+        log("ERROR: Multiplier must be > 1 for Martingale");
+        return;
+    }
+
+    // --- STRATEGY SWITCHER ---
+    switch (strategy) {
+        case 'martingale':
+            while ((totalCost + currentBet) <= balance) {
+                totalCost += currentBet;
+                currentBet *= mult;
+                losses++;
+                if(losses > 100) break;
+            }
+            break;
+
+        case 'dalembert':
+            // In D'Alembert, you increase the bet by +BaseBet for every loss
+            while ((totalCost + currentBet) <= balance) {
+                totalCost += currentBet;
+                currentBet += baseBet; 
+                losses++;
+                if(losses > 1000) break; // D'Alembert lasts much longer
+            }
+            break;
+        case 'oscars':
+    // Oscar's Grind logic: The goal is to make 1 unit profit per cycle.
+    // In a simulation of a "bad run", we look at how the bet scales.
+    let unit = baseBet;
+    let currentCycleProfit = 0;
+    while ((totalCost + currentBet) <= balance) {
+        totalCost += currentBet;
+        losses++;
+        
+        // In Oscar's Grind, if you lose, the bet stays the same.
+        // If you win (not simulated here), the bet increases by 1 unit.
+        // For a "Ruin Chance" safety analysis, we simulate the "stagnant" 
+        // phase where bets slowly escalate.
+        if (losses % 3 === 0) { 
+            currentBet += unit; 
+        }
+
+        if(losses > 500) break; // High survival cap
+    }
+    break;
+    case 'paroli':
+        // Simulation: How many consecutive losses can you survive?
+        // Since you reset to base bet after every loss, 
+        // the calculation is Balance / BaseBet.
+        losses = Math.floor(balance / baseBet); 
+        totalCost = balance; // Total potential risk
+        break;
+    case 'kelly':
+    // Kelly Math: (Probability of Win * Odds - Probability of Loss) / Odds
+     winProb = 0.5; // owo cf is 50/50
+    const odds = 1;      // pays 1 to 1
+    const loseProb = 1 - winProb;
+    
+    // Calculate the percentage of the wallet to bet (using 10% Fractional Kelly for safety)
+    const kellyFraction = ((winProb * odds) - loseProb) / odds;
+    
+    // Since 50/50 has 0 edge, we use a safety-adjusted 1% of wallet for the simulation
+    const adjustedKelly = 0.01; 
+    let kellyBase = Math.floor(balance * adjustedKelly);
+    
+    // Simulate survival: In Kelly, you never actually go to zero, 
+    // but we simulate how many 50/50 losses it takes to hit "dust" (under 100 cowoncy)
+    let tempBalance = balance;
+    while (tempBalance > 100) {
+        let bet = Math.max(baseBet, Math.floor(tempBalance * adjustedKelly));
+        tempBalance -= bet;
+        losses++;
+        if(losses > 1000) break; // Extremely high survival
+    }
+    totalCost = balance - tempBalance;
+    break;
+    }
+
+    // 2. Math & UI Update
+    const lossProb = 1 - winProb;
+    const ruinChance = (Math.pow(lossProb, losses) * 100);
+    const safetyBuffer = 12;
+    const suitableBet = Math.floor(balance * (mult - 1) / (Math.pow(mult, safetyBuffer) - 1));
+    
+    document.getElementById('m-streak').innerText = `${losses} Rounds`;
+    document.getElementById('m-ruin').innerText = `${ruinChance.toFixed(4)}%`;
+    document.getElementById('m-rec').innerText = suitableBet > 0 ? suitableBet.toLocaleString() : "1";
+    document.getElementById('m-profit').innerText = `${(baseBet * 4).toLocaleString()}/hr`;
+
+    log(`Strategy: ${strategy.toUpperCase()}`);
+    log(`Total Risked in Streak: ${totalCost.toLocaleString()}`);
+    
+    function calculateStrategy() {
+    // Existing values from your code
+    const balance = parseFloat(document.getElementById('balance').value);
+    const baseBet = parseFloat(document.getElementById('baseBet').value);
+    const strategy = document.getElementById('strategy').value;
+    
+    // New Stop Loss / Take Profit values
+    const takeProfitGoal = parseFloat(document.getElementById('target-profit').value) || Infinity;
+    const stopLossLimit = parseFloat(document.getElementById('stop-loss').value) || balance;
+
+    let currentBalance = balance;
+    let sessionProfit = 0;
+    let totalLoss = 0;
+    let isActive = true;
+    let rounds = 0;
+
+    // Simulation Loop for Stop Loss/Take Profit
+    while (isActive && rounds < 1000) { // Safety cap of 1000 rounds
+        rounds++;
+        
+        // Example Martingale Logic
+        // In a real session, this would simulate the win/loss outcome
+        let win = Math.random() > 0.5; // Simple 50/50 for Coinflip
+        
+        if (win) {
+            currentBalance += baseBet;
+            sessionProfit += baseBet;
+        } else {
+            currentBalance -= baseBet; 
+            totalLoss += baseBet;
+        }
+
+        // --- THE STOP LOSS / TAKE PROFIT LOGIC ---
+        if (currentBalance >= balance + takeProfitGoal) {
+            log(`[SUCCESS] Take Profit reached after ${rounds} rounds!`);
+            isActive = false;
+        } 
+        else if (totalLoss >= stopLossLimit || currentBalance <= 0) {
+            log(`[STOP] Stop Loss triggered! Total session loss: ${totalLoss}`);
+            isActive = false;
+        }
+    }
+    
+    // Update your UI elements (m-streak, m-ruin, etc.)
+    document.getElementById('m-streak').innerText = `${rounds} Rounds`;
+}
+
+ function getAdvice() {
+    const game = document.getElementById('game').value;
+    const panel = document.getElementById('advisor-panel');
+    const bjInputs = document.getElementById('bj-inputs');
+    const cfInputs = document.getElementById('cf-inputs');
+    const display = document.getElementById('advice-box');
+    const title = document.getElementById('advisor-title');
+
+    // Reset visibility
+    panel.classList.add('hidden');
+    bjInputs.classList.add('hidden');
+    cfInputs.classList.add('hidden');
+
+    if (game === 'slots') {
+        return; // Logic: Nothing in the terminal for slots
+    }
+
+    panel.classList.remove('hidden');
+
+    if (game === 'blackjack') {
+        title.innerText = "Blackjack Advisor";
+        bjInputs.classList.remove('hidden');
+        
+        const player = parseInt(document.getElementById('player-hand').value);
+        const dealer = parseInt(document.getElementById('dealer-card').value);
+
+        if (!player || !dealer) {
+            display.innerText = "ADVICE: ENTER HAND";
+            return;
+        }
+
+        let move = (player <= 11 || (player === 12 && (dealer < 4 || dealer > 6)) || (player >= 13 && player <= 16 && dealer > 6)) ? "HIT" : "STAY";
+        display.innerText = `ADVICE: ${move}`;
+        display.style.backgroundColor = move === "HIT" ? "#dcfce7" : "#fee2e2";
+    } 
+
+    if (game === 'cf') {
+        title.innerText = "Coinflip Strategy";
+        cfInputs.classList.remove('hidden');
+        
+        // Scheme: Heads-Heads, Tails-Tails (alternating pairs)
+        // We use the "Live Streak" input to determine where you are in the sequence
+        const streak = parseInt(document.getElementById('live-streak').value) || 0;
+        const sequence = ["HEADS", "HEADS", "TAILS", "TAILS"];
+        const move = sequence[streak % 4];
+        
+        display.innerText = `NEXT BET: ${move}`;
+        display.style.backgroundColor = "#e0f2fe"; // Neutral blue for CF
+    }
+}
+
+// Add this to your existing game select element: onchange="runSimulation(); getAdvice();"
+
+ calculateStrategy();
+    
+    setTimeout(() => {
+        let rating = "";
+        if (ruinChance < 0.01) rating = `<span class="text-purple-400 font-bold">[GOD-TIER]</span>`;
+        else if (ruinChance < 0.5) rating = `<span class="text-blue-400 font-bold">[SECURE]</span>`;
+        else if (ruinChance < 2.0) rating = `<span class="text-yellow-400 font-bold">[CAUTION]</span>`;
+        else rating = `<span class="text-red-500 font-bold">[LIQUIDATION RISK]</span>`;
+        
+        log(`RATING: ${rating}`);
+    }, 600);
+    
+ }
+    
+    // ... existing functions like updateLiveBet() or updateStreakAlert()
+function exportToDiscord() {
+    const strategy = document.getElementById('strategy').value.toUpperCase();
+    const balance = document.getElementById('balance').value;
+    const streak = document.getElementById('m-streak').innerText;
+    const ruin = document.getElementById('m-ruin').innerText;
+    const recBet = document.getElementById('m-rec').innerText;
+    const profit = document.getElementById('m-profit').innerText;
+    
+    // Determine the status rating based on the ruin chance text
+    const ruinVal = parseFloat(ruin);
+    let status = "SECURE";
+    if (ruinVal > 2.0) status = "LIQUIDATION RISK";
+    else if (ruinVal > 0.5) status = "CAUTION";
+
+    const report = "```diff\n" +
+        "=== STAN SESSION REPORT ===\n" +
+        `+ Strategy:  ${strategy}\n` +
+        `+ Wallet:    ${balance} Cowoncy\n` +
+        `+ Safety:    ${streak}\n` +
+        `+ Risk:      ${ruin}\n` +
+        `+ Rec. Bet:  ${recBet}\n` +
+        `+ Est. Gain: ${profit}\n\n` +
+        `>> Status: ${status}\n` +
+        "```";
+
+    const textArea = document.createElement("textarea");
+    textArea.value = report;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        log("Report exported to clipboard.");
+    } catch (err) {
+        console.error("Copy failed", err);
+    }
+    document.body.removeChild(textArea);
+}
+</script>
+</body>
+</html>
