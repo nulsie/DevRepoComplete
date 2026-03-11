@@ -1,0 +1,907 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIES v5</title>
+    
+    <script src="3.4.17"></script>
+    
+    <script src="crypto-js.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    // Using Geneva/Chicago alternatives for classic Mac look
+                    fontFamily: {
+                        sans: ['Geneva', 'Arial', 'sans-serif'],
+                        mono: ['Monaco', 'Courier New', 'monospace'],
+                    },
+                    colors: {
+                        // Classic Mac OS Platinum colors
+                        'mac-blue': '#0000CC', // Dark Blue for primary action/text
+                        'mac-grey-light': '#DDDDDD',
+                        'mac-grey-mid': '#CCCCCC', // Platinum shade for internal panels
+                        'mac-dark': '#000000',
+                        'mac-red': '#CC3300', // Warning/Delete color
+                        'swiss-red': '#D52B1E', // Bold Red for the title bar
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles to achieve the Classic Mac OS 8/9 Platinum look */
+        body {
+            background-color: #DDDDDD; /* Light Mac desktop background */
+            font-size: 13px; /* Slightly smaller font for the old-school feel */
+        }
+
+        /* Mac App Look (Platinum Panel) */
+        .mac-panel {
+            background-color: #FFFFFF; /* White main background */
+            border: 1px solid #000000;
+            box-shadow: 2px 2px 0 0 #3a3a3a;
+        }
+        
+        /* Inner Mac Panel/Container (Light Grey) - for content areas */
+        .mac-inner-panel {
+            background-color: #EEEEEE; /* Light grey content area */
+            border: 1px solid #999999;
+            padding: 8px;
+        }
+
+        /* Mac Title Bar (SWISS RED) */
+        .mac-title-bar {
+             background-color: #D52B1E; /* Swiss Red color */
+             border-bottom: 1px solid #000000;
+             color: #FFFFFF; /* White text for contrast */
+             font-weight: bold;
+             padding: 4px 6px;
+        }
+
+
+        /* Mac Button Effect (Chiseled Platinum Look) */
+        .mac-button {
+            border: 1px solid #000000;
+            background-color: #CCCCCC;
+            cursor: pointer;
+            transition: none;
+            font-weight: bold;
+            line-height: 1.2;
+            padding: 4px 10px;
+            text-align: center;
+            /* Subtle chiseled highlight/shadow */
+            border-top-color: #FFFFFF;
+            border-left-color: #FFFFFF;
+        }
+
+        /* Default Mac Button Push/Active Effect (Invert colors/shadow) */
+        .mac-button:active {
+            border: 1px solid #000000;
+            background-color: #AAAAAA;
+            border-top-color: #000000;
+            border-left-color: #000000;
+            border-bottom-color: #FFFFFF;
+            border-right-color: #FFFFFF;
+            transform: none; 
+            box-shadow: none;
+        }
+        
+        /* Primary (Access Deposit/Save) Button */
+        .mac-button-primary {
+            background-color: #EEEEEE; /* Greyish White background as requested */
+            color: #000000; /* Black text */
+            border-color: #000000;
+            box-shadow: none;
+            /* Outset look */
+            border-top-color: #FFFFFF;
+            border-left-color: #FFFFFF;
+        }
+
+        .mac-button-primary:active {
+            background-color: #FFFFE0; /* Yellowish white when clicked (retaining hover effect) */
+            border-color: #000000;
+            /* Inset look */
+            border-top-color: #000000; 
+            border-left-color: #000000;
+            border-bottom-color: #FFFFFF;
+            border-right-color: #FFFFFF;
+        }
+
+        /* Input/Textarea Effect */
+        .mac-input, .mac-textarea {
+            border: 1px solid #000000; 
+            background-color: white;
+            padding: 4px;
+            font-family: 'Monaco', 'Courier New', monospace; 
+            box-shadow: 1px 1px 0 0 #888888 inset; /* Subtle inset shadow */
+        }
+
+        /* Navigation Bar Tabs */
+        .mac-tab {
+            border: 1px solid #000000;
+            background-color: #CCCCCC;
+            margin-right: -1px;
+            padding: 4px 10px;
+            font-weight: normal;
+        }
+        .mac-tab.active {
+            background-color: #FFFFFF;
+            border-bottom: 1px solid #FFFFFF;
+            font-weight: bold;
+            margin-top: -1px;
+            padding-top: 5px;
+        }
+
+        /* Document List Item Style */
+        .doc-item {
+            border: 1px solid #DDDDDD;
+            margin-bottom: 2px;
+            padding: 3px 6px;
+            background-color: #FFFFFF;
+            cursor: pointer;
+            border-left: 2px solid transparent; /* Selection indicator */
+        }
+        .doc-item:hover {
+            background-color: #E0E0E0;
+        }
+        .doc-item.active {
+            background-color: #FFFFFF;
+            color: #000000;
+            border: 1px solid #000000;
+            border-left: 2px solid #0000CC; /* Mac Blue selection bar */
+            font-weight: bold;
+        }
+        .doc-item.active .text-xs {
+             color: #333333;
+        }
+        .doc-item-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body class="font-sans flex items-start justify-center min-h-screen p-4 sm:p-8">
+
+    <div id="loading-screen" class="fixed inset-0 flex items-center justify-center bg-[#DDDDDD] z-[9999]">
+        <div class="mac-panel p-6 text-center shadow-lg" style="width: 280px;">
+            <p class="text-3xl font-bold tracking-tighter border-b-2 border-mac-dark pb-2">PIES</p>
+            <p class="text-sm mb-4">Initialising Secure Data Deposit System...</p>
+            <div class="h-3 bg-mac-grey-mid border border-black overflow-hidden">
+                <div id="loading-bar" class="h-full bg-mac-blue transition-all duration-700 ease-linear" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="app-container" class="w-full max-w-5xl mt-10 mac-panel rounded-none hidden">
+        <div class="mac-title-bar flex justify-between items-center">
+            <span class="text-base">PIES - Pretty Isolated and Encrypted Software</span>
+            <div class="flex space-x-1">
+                <button onclick="handleLogout()" class="w-4 h-4 bg-white border border-black flex items-center justify-center text-[10px] text-mac-dark font-bold p-0 leading-none">
+                    <svg width="8" height="8" viewBox="0 0 100 100" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="50" fill="#CC3300"/>
+                        <path d="M35 35 L65 65 M35 65 L65 35" stroke="white" stroke-width="12" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="p-4 bg-white">
+            <div id="auth-view" class="mac-panel p-6 max-w-md mx-auto hidden">
+                <h2 class="text-xl font-bold mb-4 text-mac-dark border-b border-mac-dark pb-2">Client Authentication</h2>
+
+                <div class="flex mb-4 -mt-1">
+                    <button id="login-tab" class="mac-tab active" data-view="login-form">ACCESS ACC.</button>
+                    <button id="register-tab" class="mac-tab" data-view="register-form">REGISTER</button>
+                    <div class="flex-grow border-b border-mac-dark"></div>
+                </div>
+
+                <div id="login-form">
+                    <p class="mb-4 text-sm">Enter your Deposit Details (Passkey and ID) to proceed.</p>
+                    <div class="mb-4">
+                        <label for="login-id" class="block mb-1 font-bold">Account ID:</label>
+                        <input type="text" id="login-id" class="mac-input w-full">
+                    </div>
+                    <div class="mb-6">
+                        <label for="login-password" class="block mb-1 font-bold">Passkey:</label>
+                        <input type="password" id="login-password" class="mac-input w-full">
+                    </div>
+                    <div class="flex justify-end">
+                        <button onclick="handleLogin()" class="mac-button mac-button-primary">Access Deposit</button>
+                    </div>
+                </div>
+
+                <div id="register-form" class="hidden">
+                    <p class="mb-4 text-mac-red font-bold">WARNING: This process is irreversible. Select a complex ID and passkey. Your data security depends on this passkey.</p>
+                    <div class="mb-4">
+                        <label for="register-id" class="block mb-1 font-bold">New Account ID:</label>
+                        <input type="text" id="register-id" class="mac-input w-full">
+                    </div>
+                    <div class="mb-4">
+                        <label for="register-password" class="block mb-1 font-bold">New Passkey:</label>
+                        <input type="password" id="register-password" class="mac-input w-full">
+                    </div>
+                    <div class="mb-6">
+    <label for="register-duress" class="block mb-1 font-bold">Duress Passkey (Emergency Wipe):</label>
+    <input type="password" id="register-duress" class="mac-input w-full" placeholder="Optional emergency key">
+</div>
+                    <div class="flex justify-end">
+                        <button onclick="handleRegister()" class="mac-button bg-mac-red text-white">Complete Registration</button>
+                    </div>
+                </div>
+
+                <p id="auth-message" class="mt-4 text-sm text-center font-bold text-mac-red hidden"></p>
+            </div>
+
+            <div id="vault-view" class="hidden">
+                <div class="mb-4 p-3 border-2 border-mac-blue bg-yellow-100/70">
+                    <p class="font-bold text-mac-dark">USER: <span id="current-user-display" class="text-mac-blue"></span> | DEPOSIT ACCESS: <span class="text-green-700">SECURE</span></p>
+                    <p class="text-xs">STATUS: Managing <span id="doc-count">0</span> Depository Items. Data is **ENCRYPTED** using your Passkey.</p>
+                </div>
+
+                <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+                    <div class="mac-panel p-3 w-full md:w-1/4 h-96 overflow-y-auto flex-shrink-0">
+                        <h3 class="font-bold text-mac-blue mb-2 border-b border-mac-dark pb-1">DEPOSITORY ITEMS</h3>
+                        <div id="document-list-container" class="mb-3">
+                        </div>
+                        <input type="file" id="file-upload-input" accept=".txt,.log,.md" class="hidden" onchange="handleFileUpload(event)">
+                        <button onclick="document.getElementById('file-upload-input').click()" class="mac-button w-full text-xs mb-2">UPLOAD FILE</button>
+                        <button onclick="createNewDocument()" class="mac-button w-full text-xs">NEW ITEM</button>
+                    </div>
+
+                    <div class="flex-grow">
+                        <div class="mac-panel p-2 mb-2 flex justify-between items-center">
+                            <label for="doc-title" class="font-bold">ITEM LABEL:</label>
+                            <input type="text" id="doc-title" placeholder="Untitled Document" class="mac-input w-3/4 text-sm" oninput="saveContent(false)">
+                        </div>
+                        
+                        <div class="mac-inner-panel p-2 mb-2 flex justify-between items-center text-xs">
+                            <span id="active-doc-status" class="text-mac-blue font-bold">Item Not Loaded.</span>
+                            <span id="last-updated-display" class="text-gray-600">Last Save: Never</span>
+                        </div>
+
+                        <textarea id="vault-content" class="mac-textarea w-full p-4 h-80 text-base resize-none" placeholder="Access a Depository Item or create a New Item to begin editing."></textarea>
+
+                        <div class="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0 mt-4">
+                            <button onclick="handleLogout()" class="mac-button w-full sm:w-auto">LOGOUT & LOCK</button>
+                            <button onclick="deleteDocument()" class="mac-button bg-mac-red text-white w-full sm:w-auto">DELETE ITEM</button>
+                            <button onclick="saveContent()" class="mac-button mac-button-primary w-full sm:w-auto">EXECUTE SAVE (PERSIST)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="info-box" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+                <div class="mac-panel p-6 max-w-sm w-full bg-white">
+                    <h3 class="text-lg font-bold mb-3 border-b pb-2" id="info-title">System Alert</h3>
+                    <p id="info-text" class="mb-4"></p>
+                    <div class="flex justify-end">
+                        <button onclick="hideInfoBox()" class="mac-button mac-button-primary">OK</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="confirm-box" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+                <div class="mac-panel p-6 max-w-sm w-full bg-white">
+                    <h3 class="text-lg font-bold mb-3 border-b pb-2" id="confirm-title">Confirmation Required</h3>
+                    <p id="confirm-text" class="mb-4"></p>
+                    <div class="flex justify-end space-x-2">
+                        <button onclick="handleConfirm(false)" class="mac-button">CANCEL</button>
+                        <button onclick="handleConfirm(true)" class="mac-button bg-mac-red text-white">CONFIRM</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function hashData(str) {
+    return CryptoJS.SHA256(str).toString();
+}
+        // --- CONSTANTS AND STATE ---
+        const STORAGE_KEY = 'VOSI_Secure_Data';
+        let currentUser = null; // Stores the currently logged-in user ID
+        let vaultKey = null;    // Stores the user's password/passkey for encryption
+        let activeDocumentId = null; // ID of the currently loaded document
+        let confirmationCallback = null; // Function to call when confirmation modal is closed
+        let displayUsername = null;
+
+        // --- DOM ELEMENTS ---
+        const authView = document.getElementById('auth-view');
+        const vaultView = document.getElementById('vault-view');
+        const vaultContent = document.getElementById('vault-content');
+        const currentUserDisplay = document.getElementById('current-user-display');
+        const docListContainer = document.getElementById('document-list-container');
+        const docCountDisplay = document.getElementById('doc-count');
+        const docTitleInput = document.getElementById('doc-title');
+        const lastUpdatedDisplay = document.getElementById('last-updated-display');
+        const activeDocStatus = document.getElementById('active-doc-status');
+        // New elements for loading screen
+        const loadingScreen = document.getElementById('loading-screen');
+        const appContainer = document.getElementById('app-container');
+        const loadingBar = document.getElementById('loading-bar');
+
+        // Modals
+        const infoBox = document.getElementById('info-box');
+        const infoTitle = document.getElementById('info-title');
+        const infoText = document.getElementById('info-text');
+        const confirmBox = document.getElementById('confirm-box');
+        const confirmTitle = document.getElementById('confirm-title');
+        const confirmText = document.getElementById('confirm-text');
+
+
+        // --- CRYPTOGRAPHY FUNCTIONS ---
+        /**
+ * Hard-wipes sensitive strings from RAM by overwriting 
+ * their memory space with random data before nullifying.
+ */
+function forceSensitiveRamPurge() {
+    console.log("INITIATING CRITICAL RAM WIPE");
+
+    // List of sensitive variables to purge
+    const sensitiveVars = [vaultKey, currentUser, activeDocumentId];
+
+    sensitiveVars.forEach(variable => {
+        if (variable && typeof variable === 'string') {
+            // 1. Create a buffer of the same length
+            let wipeBuffer = new Uint8Array(variable.length);
+            
+            // 2. Fill it with random cryptographical noise
+            window.crypto.getRandomValues(wipeBuffer);
+            
+            // 3. Attempt to "clobber" the reference by filling it with noise
+            variable = wipeBuffer.join(''); 
+        }
+    });
+
+    // 4. Nullify the global references
+    vaultKey = null;
+    currentUser = null;
+    activeDocumentId = null;
+    
+    // 5. Clear the UI fields physically
+    document.getElementById('vault-content').value = "";
+    document.getElementById('doc-title').value = "";
+
+    // 6. Suggest Garbage Collection (Works in certain hardened environments)
+    if (window.gc) {
+        window.gc();
+    }
+
+    console.log("RAM PURGE COMPLETE.");
+}
+        function deriveKey(password, salt) {
+    // Generates a strong 256-bit key using 10,000 rounds of hashing
+    return CryptoJS.PBKDF2(password, salt, {
+        keySize: 256 / 32,
+        iterations: 100000
+    }).toString();
+}
+        /** Encrypts plaintext content using the current vaultKey (AES). */
+        function encryptContent(text) {
+            if (!vaultKey) return text; // Should not happen if called while logged in
+            // CryptoJS returns a CipherParams object, which is stringified upon .toString()
+            return CryptoJS.AES.encrypt(text, vaultKey).toString();
+        }
+
+        /** Decrypts ciphertext content using the current vaultKey (AES). */
+        function decryptContent(cipher) {
+            if (!vaultKey) return cipher; // Should not happen if called while logged in
+            try {
+                const cipherString = typeof cipher === 'object' ? cipher.toString() : cipher; 
+                // Decrypts the cipher text
+                const bytes = CryptoJS.AES.decrypt(cipher, vaultKey);
+                // Converts the byte array to a UTF8 string. Returns empty string on failure/bad key
+                const plaintext = bytes.toString(CryptoJS.enc.Utf8);
+                
+                // If the decryption resulted in an empty string but the original cipher was not empty, 
+                // it likely means the key was incorrect or data corrupted.
+                if (plaintext === '' && cipherString !== '') {
+                    console.warn("Decryption returned empty string for non-empty cipher.")
+                    return "Decryption Error: Check Passkey";
+                }
+                
+                return plaintext;
+
+            } catch (e) {
+                console.error("Decryption failed:", e);
+                return "Error: Could not decrypt.";
+             }
+        }
+        
+        // --- NEW CRYPTOGRAPHY FUNCTION FOR CREDENTIAL PROTECTION ---
+        /** Creates a SHA256 hash of the input string for storing credentials securely. */
+        function hashPasskey(passkey, salt) {
+            // Using SHA-256 for one-way hashing of the passkey
+            return CryptoJS.SHA256(passkey + salt).toString();
+        }
+
+
+        // --- UTILITY FUNCTIONS ---
+
+        /** Retrieves all user data from local storage. */
+        function getVaultData() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : {};
+            } catch (e) {
+                console.error("Error loading data from local storage:", e);
+                return {};
+            }
+        }
+
+        /** Stores all user data to local storage. */
+        function setVaultData(data) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.error("Error saving data to local storage:", e);
+                showInfoBox("Error", "CRITICAL: Could not save data to your browser's local storage.");
+            }
+        }
+
+        /** Formats a timestamp into a readable date string. */
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'Never';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        /** Displays a custom confirmation modal. */
+        function showConfirmBox(title, message, callback) {
+            confirmTitle.textContent = title;
+            confirmText.textContent = message;
+            confirmationCallback = callback;
+            confirmBox.classList.remove('hidden');
+            confirmBox.classList.add('flex');
+        }
+
+        /** Handles confirmation modal response. */
+        function handleConfirm(result) {
+            confirmBox.classList.add('hidden');
+            confirmBox.classList.remove('flex');
+            if (confirmationCallback) {
+                confirmationCallback(result);
+                confirmationCallback = null;
+            }
+        }
+
+        /** Displays a custom information box instead of using alert(). */
+        function showInfoBox(title, message) {
+            infoTitle.textContent = title;
+            infoText.textContent = message;
+            infoBox.classList.remove('hidden');
+            infoBox.classList.add('flex');
+        }
+
+        /** Hides the custom information box. */
+        function hideInfoBox() {
+            infoBox.classList.add('hidden');
+            infoBox.classList.remove('flex');
+        }
+
+        // --- UI & DATA MANAGEMENT ---
+
+        /** Updates the UI to show the correct view (Auth or Vault). */
+        function updateUI() {
+            if (currentUser && vaultKey) {
+                authView.classList.add('hidden');
+                vaultView.classList.remove('hidden');
+                currentUserDisplay.textContent = displayUsername;
+                loadDocumentList();
+            } else {
+                authView.classList.remove('hidden');
+                vaultView.classList.add('hidden');
+                activeDocumentId = null;
+                vaultContent.value = '';
+                docTitleInput.value = '';
+                lastUpdatedDisplay.textContent = 'Last Save: Never';
+                activeDocStatus.textContent = 'Item Not Loaded.';
+            }
+        }
+
+        /** * Loads the list of documents for the current user into the sidebar.
+         * @param {boolean} selectFirst - If true, loads the first document if none is active.
+         */
+        function loadDocumentList(selectFirst = true) {
+            if (!currentUser) return;
+            const data = getVaultData();
+            const user = data[currentUser];
+
+            // Initialize user documents if none exist (for new users or old accounts being upgraded)
+            if (!user.documents) {
+                user.documents = [];
+            }
+            
+            if (user.documents.length === 0) {
+                // Create a default document, encrypting the content immediately
+                const defaultContent = 'Enter your item';
+                
+                user.documents.push({
+                    id: crypto.randomUUID(),
+                    title: encryptContent('DEFAULT SECURE LOG'),
+                    content: encryptContent(defaultContent), // ENCRYPTED content using vaultKey
+                    lastUpdated: Date.now()
+                });
+                setVaultData(data);
+            }
+
+            docListContainer.innerHTML = '';
+            docCountDisplay.textContent = user.documents.length;
+
+            user.documents.forEach(doc => {
+                const div = document.createElement('div');
+                const displayTitle = decryptContent(doc.title);
+                div.className = `doc-item text-left ${doc.id === activeDocumentId ? 'active' : ''}`;
+                div.dataset.docId = doc.id;
+                div.setAttribute('onclick', `loadDocument('${doc.id}')`);
+
+                div.innerHTML = `
+                    <p class="doc-item-title text-sm">${displayTitle}</p>
+                    <p class="text-xs text-gray-700">Modified: ${formatTimestamp(doc.lastUpdated)}</p>
+                `;
+                docListContainer.appendChild(div);
+            });
+
+            // Only load the first document if requested AND no document is currently active.
+            if (user.documents.length > 0 && selectFirst && !activeDocumentId) {
+                loadDocument(user.documents[0].id);
+            }
+        }
+
+        /** Loads a specific document by ID into the editor and decrypts content. */
+        function loadDocument(docId, shouldSave = true) {
+            if (!currentUser || !vaultKey) return;
+            
+            // Save current content before switching
+            if (activeDocumentId && shouldSave) {
+                saveContent(false);
+            }
+
+            const data = getVaultData();
+            const user = data[currentUser];
+            const doc = user.documents.find(d => d.id === docId);
+
+            if (doc) {
+                activeDocumentId = docId;
+                docTitleInput.value = decryptContent(doc.title);
+                
+                // DECRYPT the content before showing it in the textarea
+                const decryptedContent = decryptContent(doc.content);
+                vaultContent.value = decryptedContent;
+
+                lastUpdatedDisplay.textContent = 'Last Save: ' + formatTimestamp(doc.lastUpdated);
+                activeDocStatus.textContent = `Item ID: ${docId.substring(0, 8)}... LOADED`;
+                
+                loadDocumentList(false); 
+            } else {
+                showInfoBox("Error", "Depository Item not found.");
+            }
+        }
+
+        /** Creates and loads a new document. */
+        function createNewDocument() {
+            if (!currentUser) return;
+
+            const data = getVaultData();
+            const user = data[currentUser];
+            
+            if (!user.documents) {
+                user.documents = [];
+            }
+            
+            const readableTitle = 'NEW ITEM - ' + (user.documents.length + 1);
+
+              const newDoc = {
+                id: crypto.randomUUID(),
+                title: encryptContent(readableTitle),
+                content: "Enter your item", 
+                lastUpdated: Date.now()
+            };
+            
+            const encryptedDefault = CryptoJS.AES.encrypt("Enter your item", vaultKey).toString();
+    newDoc.content = encryptedDefault;
+
+            user.documents.push(newDoc);
+            setVaultData(data);
+            loadDocumentList(false);
+            loadDocument(newDoc.id, false); // No need to save blank content before loading it
+            showInfoBox("New Item Created", `New item "${readableTitle}" added to your depository.`);
+        }
+
+        /** Saves content from the editor back to local storage (encrypting the content). */
+        function saveContent(showSuccess = true) {
+            if (!currentUser || !activeDocumentId || !vaultKey) return;
+
+            const data = getVaultData();
+            const user = data[currentUser];
+
+            const docIndex = user.documents.findIndex(d => d.id === activeDocumentId);
+
+            if (docIndex !== -1) {
+                // ENCRYPT the current content from the textarea before saving
+                const plainTitle = docTitleInput.value.trim() || 'Untitled Item';
+                user.documents[docIndex].content = encryptContent(vaultContent.value);
+                user.documents[docIndex].title = encryptContent (docTitleInput.value.trim() || 'Untitled Item');
+                user.documents[docIndex].lastUpdated = Date.now();
+                
+                setVaultData(data);
+                loadDocumentList(false); // Update list entry (last updated time)
+                lastUpdatedDisplay.textContent = 'Last Save: ' + formatTimestamp(user.documents[docIndex].lastUpdated);
+
+                if (showSuccess) {
+                    showInfoBox("Data Saved", `Item "${plainTitle}" has been securely saved and encrypted.`);
+                }
+            }
+        }
+        
+        /** Deletes the currently active document. */
+        function deleteDocument() {
+            if (!currentUser || !activeDocumentId) {
+                showInfoBox("Action Required", "No document is currently selected for deletion.");
+                return;
+            }
+
+            showConfirmBox(
+                "Confirmation Required",
+                `Are you sure you want to PERMANENTLY delete item "${docTitleInput.value}"? This action cannot be undone.`,
+                (confirmed) => {
+                    if (confirmed) {
+                        const data = getVaultData();
+                        const user = data[currentUser];
+
+                        user.documents = user.documents.filter(d => d.id !== activeDocumentId);
+                        setVaultData(data);
+
+                        activeDocumentId = null;
+                        
+                        // Clear editor and reload
+                        vaultContent.value = '';
+                        docTitleInput.value = '';
+                        lastUpdatedDisplay.textContent = 'Last Save: Never';
+                        activeDocStatus.textContent = 'Document Not Loaded.';
+
+                        showInfoBox("Item Deleted", "The item has been successfully purged from the system.");
+                        loadDocumentList(true); // Reload list and select first remaining document
+                    }
+                }
+            );
+        }
+
+        // --- NEW FUNCTION: FILE UPLOAD HANDLER ---
+
+        /** Handles the file selection event to read and process the uploaded text file. */
+        function handleFileUpload(event) {
+            if (!currentUser || !vaultKey) {
+                showInfoBox("Action Required", "You must be logged in to upload files.");
+                return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) {
+                return; // No file selected
+            }
+
+            // Basic check for text file type
+            if (!file.type.match('text.*') && !file.name.match(/\.(txt|log|md)$/i)) {
+                showInfoBox("File Error", "Only text-based files (.txt, .log, .md) are supported for upload.");
+                // Clear the input so the user can select the same file again if needed
+                event.target.value = '';
+                return;
+            }
+
+            // Maximum file size of 1MB (1024 * 1024 bytes)
+            if (file.size > 1048576) {
+                showInfoBox("File Error", "File size exceeds the 1MB limit for text documents.");
+                event.target.value = '';
+                return;
+            }
+
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const fileContent = e.target.result;
+                
+                // Save current open document silently before creating the new one
+                if (activeDocumentId) {
+                    saveContent(false);
+                }
+
+                const data = getVaultData();
+                const user = data[currentUser];
+
+                const newDoc = {
+                    id: crypto.randomUUID(),
+                    // Use the file name as the title, removing the extension
+                    title: encryptContent(file.name.replace(/\.[^/.]+$/, "") || 'UPLOADED FILE') , 
+                    content: encryptContent(fileContent), // ENCRYPT the uploaded content
+                    lastUpdated: Date.now()
+                };
+
+                user.documents.push(newDoc);
+                setVaultData(data);
+                
+                // Load and display the newly uploaded document
+                loadDocumentList(false);
+                loadDocument(newDoc.id, false); 
+
+                showInfoBox("Upload Complete", `File "${file.name}" uploaded, encrypted, and saved as a new item.`);
+
+                // Clear the input so the user can upload the same file again
+                event.target.value = '';
+            };
+
+            reader.onerror = function() {
+                showInfoBox("File Read Error", "Failed to read the file. Please try again.");
+                event.target.value = '';
+            };
+
+            reader.readAsText(file);
+        }
+
+
+        // --- AUTHENTICATION HANDLERS (UPDATED) ---
+
+        /** Handles user registration. */
+        function handleRegister() {
+            const id = document.getElementById('register-id').value.trim();
+            const password = document.getElementById('register-password').value; // Original Passkey
+            const duress = document.getElementById('register-duress').value;
+
+            if (!id || id.length < 3) {
+                showInfoBox("Registration Failed", "Account ID must be at least 3 characters long.");
+                return;
+            }
+            if (password.length < 5) {
+                showInfoBox("Registration Failed", "Passkey must be at least 5 characters long.");
+                return;
+            }
+
+            const data = getVaultData();
+            const idHash = hashData(id);
+            if (data[idHash]) {
+                showInfoBox("Registration Failed", "Account ID already exists. Please login or choose another ID.");
+                return;
+            }
+const userSalt = CryptoJS.lib.WordArray.random(128/8).toString();
+            // --- NEW: Hash the Passkey before storing ---
+            const hashedPasskey = deriveKey(password, userSalt);
+            const hashedDuress = duress ? deriveKey(duress, userSalt) : null;
+
+            // Store the HASHED password in 'passwordHash' (instead of plaintext 'password')
+            data[idHash] = { passwordHash: hashedPasskey,
+                duressHash: hashedDuress,
+                salt: userSalt, 
+            documents: [] };
+            setVaultData(data);
+
+            document.getElementById('register-id').value = '';
+            document.getElementById('register-password').value = '';
+            document.getElementById('register-duress').value = '';
+
+            showInfoBox("Success", `Account ID "${id}" created successfully. Please use the Login tab to access your vault.`);
+            switchTab('login-form');
+        }
+
+        /** Handles user login. */
+        function handleLogin() {
+            const id = document.getElementById('login-id').value.trim();
+            const password = document.getElementById('login-password').value; // Original Passkey entered by user
+
+            const data = getVaultData();
+            const idHash = hashData(id);
+            const user = data[idHash];
+
+            if (!user || !user.salt) {
+                showInfoBox("Authentication Failure", "Invalid Account ID or Passkey. Please verify your credentials.");
+                return;
+            }
+
+            // --- NEW: Hash the entered Passkey and compare with the stored hash ---
+            const enteredPasskeyHash = deriveKey(password, user.salt);
+            
+            // Check if the entered password hash matches the stored hash (passwordHash is used for comparison)
+            // The check for 'user.password' is included to support legacy data structure if needed
+            if (user.duressHash && enteredPasskeyHash === user.duressHash) {
+        console.warn("DURESS KEY DETECTED. PURGING DATA.");
+        
+        // 1. Wipe all documents for this user
+        user.documents = [];
+        
+        // 2. Clear the duress hash so it can't be used to "wipe" an empty account repeatedly
+        // (Optional: keeps the UI plausible by showing a fresh, empty account)
+        setVaultData(data); 
+
+        // 3. Set session variables as if it's a normal login
+        currentUser = idHash;
+        displayUsername = id;
+        vaultKey = password; // The duress key becomes the "encryption key" for the now-empty vault
+        
+        updateUI();
+        return;
+    }
+            if (user.passwordHash === enteredPasskeyHash) {
+                
+                // If successful, SET the original, un-hashed Passkey as the vaultKey for AES encryption/decryption
+                currentUser = idHash;
+                displayUsername = id;
+                vaultKey = password; 
+                
+                document.getElementById('login-id').value = '';
+                document.getElementById('login-password').value = '';
+                updateUI();
+            } else {
+                showInfoBox("Authentication Failure", "Invalid Account ID or Passkey. Please verify your credentials.");
+            }
+        }
+
+        /** Handles user logout. */
+        function handleLogout(isSilent = false) {
+            if (currentUser) {
+                // Before logging out, ensure current content is saved
+                saveContent(false);
+            }
+            forceSensitiveRamPurge(); updateUI();
+            if (!isSilent) {
+                showInfoBox("Session Locked", "You have successfully logged out. Your deposit is now secure.");
+            }
+        }
+
+        // --- TAB SWITCHING (Login/Register) ---
+        function switchTab(formId) {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-tab').classList.remove('active');
+            document.getElementById('register-tab').classList.remove('active');
+
+            document.getElementById(formId).classList.remove('hidden');
+            if (formId === 'login-form') {
+                document.getElementById('login-tab').classList.add('active');
+            } else {
+                document.getElementById('register-tab').classList.add('active');
+            }
+        }
+
+        document.getElementById('login-tab').addEventListener('click', () => switchTab('login-form'));
+        document.getElementById('register-tab').addEventListener('click', () => switchTab('register-form'));
+
+        // --- INITIALIZATION (with Loading Screen - 10s delay) ---
+        
+        function initializeApp() {
+            const totalDelay = 10000; // 10 seconds in milliseconds
+            
+            // 1. Initial jump to 30% quickly
+            loadingBar.style.width = '30%';
+
+            // 2. Smooth transition to 100% over the remaining time (e.g., 9 seconds)
+            setTimeout(() => {
+                loadingBar.style.transitionDuration = `${totalDelay - 500}ms`; // Set transition time dynamically
+                loadingBar.style.width = '100%';
+            }, 500); // 0.5 seconds into the load
+
+            // 3. Hide loading screen and show app content after the total delay
+            setTimeout(() => {
+                loadingScreen.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+
+                // Start the actual application logic (show auth or vault)
+                updateUI();
+            }, totalDelay); 
+        }
+        
+        window.onload = initializeApp;
+
+        // Auto-save feature: save content every 10 seconds while logged in
+        setInterval(() => {
+            if (currentUser && activeDocumentId && vaultKey) {
+                saveContent(false); // Silent save
+            }
+        }, 10000); // 10 seconds
+
+    </script>
+</body>
+</html>
